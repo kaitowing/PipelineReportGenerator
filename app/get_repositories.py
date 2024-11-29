@@ -17,7 +17,6 @@ start_of_week = today - timedelta(days=today.weekday())
 START_OF_THE_WEEK = start_of_week.strftime("%Y-%m-%dT%H:%M:%S%z")
 
 def fetch_repositories():
-    """Busca todos os repositórios atualizados desde o início da semana, lidando com a paginação."""
     url = f"{BASE_URL}/repositories/{WORKSPACE}"
     params = {
         "fields": "values.slug,values.uuid,values.updated_on,next",
@@ -42,7 +41,6 @@ def fetch_repositories():
     return repositories
 
 def save_repositories_to_file(repositories, file_path=OUTPUT_FILE):
-    """Salva os dados dos repositórios em um arquivo JSON."""
     try:
         with open(file_path, "w") as file:
             formatted_data = json.dumps(repositories, indent=4)
@@ -52,7 +50,6 @@ def save_repositories_to_file(repositories, file_path=OUTPUT_FILE):
         print(f"Erro ao salvar o arquivo: {e}")
 
 def main():
-    """Fluxo principal do script."""
     repositories = fetch_repositories()
     if repositories:
         save_repositories_to_file(repositories)
