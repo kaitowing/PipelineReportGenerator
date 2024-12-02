@@ -8,6 +8,7 @@ __pycache__/
 
 report.json
 report.md
+pyvenv.cfg
 
 # Distribution / packaging
 .Python
