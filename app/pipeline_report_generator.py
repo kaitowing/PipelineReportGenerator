@@ -17,11 +17,7 @@ RAW_OUTPUT_FILE = os.getenv("OUTPUT_FILE", "report.json")
 REPORT_OUTPUT_FILE = os.getenv("REPORT_OUTPUT_FILE", "report.md")
 IGNORE_FORKS = os.getenv("IGNORE_FORKS", "").split(",")
 IGNORE_REPO = os.getenv("IGNORE_REPO", "").split(",")
-
-# Set the start of the week to the previous Monday
-today = datetime.today()
-start_of_week = today - timedelta(days=today.weekday())
-START_OF_THE_WEEK = start_of_week
+START_OF_THE_WEEK = datetime.today() - timedelta(days=7)
 
 total_users = []
 
@@ -62,7 +58,7 @@ def fetch_pipeline_data(repo_slug):
     """
     url = f"{BASE_URL}/repositories/{WORKSPACE}/{repo_slug}/pipelines/"
     params = {
-        "fields": "values.created_on,values.build_seconds_used,values.creator.nickname,next",
+        "fields": "values.created_on,values.duration_in_seconds,values.creator.nickname,next",
         "sort": "-created_on",
         "pagelen": 100,
     }
@@ -89,7 +85,7 @@ def fetch_pipeline_data(repo_slug):
                 if created_on > START_OF_THE_WEEK:
                     pipelines.append(pipeline)
                     total_pipelines += 1
-                    total_time_spent += pipeline.get("build_seconds_used", 0)
+                    total_time_spent += pipeline.get("duration_in_seconds", 0)
                     if pipeline.get("creator"):
                         users.append(pipeline["creator"].get("nickname"))
                         total_users.append(pipeline["creator"].get("nickname"))
@@ -126,26 +122,58 @@ def delete_file(file_path):
         print(f"File {file_path} not found.")
 
 
-def save_report(repositories, file_path):
-    """Save a report with repository and pipeline data."""
+def save_report(repositories, file_path, longest_slug=""):
+    """Save a report with repository and pipeline data formatted as a table for Slack."""
     try:
         delete_file(file_path)
+        TOTAL_MINUTES = "Total de minutos"
+        TOTAL_PIPES = "Quantidade de pipes"
+        AVERAGE_MINUTES = "Média de minutos"
+
         with open(file_path, "w") as file:
-            file.write("# Repository and Pipeline Report\n")
+            # Cabeçalho da tabela
+            file.write(
+                f"| {'Projeto'.ljust(len(longest_slug))} | {TOTAL_MINUTES} | {TOTAL_PIPES} | {AVERAGE_MINUTES} |\n"
+            )
+
+            for repo in repositories:
+                # Escreve os dados de cada repositório
+                slug = repo["slug"]
+                pipelines_time_spent = f"{repo['pipelines_time_spent']:.2f}"
+                pipelines_count = str(repo["pipelines_count"])
+                average_time_spent = (
+                    f"{repo['pipelines_time_spent']/repo['pipelines_count']:.2f}"
+                    if repo["pipelines_count"]
+                    else "0.00"
+                )
+                if repo["slug"] == longest_slug:
+                    file.write(
+                        f"| {slug} | {pipelines_time_spent.ljust(len(TOTAL_MINUTES))} | {pipelines_count.ljust(len(TOTAL_PIPES))} | {average_time_spent.ljust(len(AVERAGE_MINUTES))} |\n"
+                    )
+                else:
+                    file.write(
+                        f"| {slug.ljust(len(longest_slug))} | {pipelines_time_spent.ljust(len(TOTAL_MINUTES))} | {pipelines_count.ljust(len(TOTAL_PIPES))} | {average_time_spent.ljust(len(AVERAGE_MINUTES))} |\n"
+                    )
+
             if total_users:
                 user_with_most_pipelines = Counter(total_users).most_common(1)[0]
+                file.write("\n")
                 file.write(
-                    f"## **User with Most Pipelines Overall**:\n- {user_with_most_pipelines[0]} ({user_with_most_pipelines[1]} pipelines)\n"
+                    f"Usuário com maior número de pipes: {user_with_most_pipelines[0]} {user_with_most_pipelines[1]} pipelines\n"
                 )
+
+            user_time_spent = {}
             for repo in repositories:
-                file.write(f"## Repository: {repo['slug']}\n")
-                file.write(f"- **Number of Pipelines**: {repo['pipelines_count']}\n")
-                file.write(
-                    f"- **Total Time Spent**: {repo['pipelines_time_spent']:.2f} minutes\n"
-                )
-                file.write("- **Users who Created Pipelines**:\n")
                 for user in repo["users"]:
-                    file.write(f"  - {user}\n")
+                    user_time_spent[user] = (
+                        user_time_spent.get(user, 0) + repo["pipelines_time_spent"]
+                    )
+            if user_time_spent:
+                user_with_most_time = max(user_time_spent.items(), key=lambda x: x[1])
+                file.write(
+                    f"Usuário com maior número de minutos: {user_with_most_time[0]} {user_with_most_time[1]:.2f} minutos\n"
+                )
+
         print(f"Report saved to {file_path}")
     except IOError as e:
         print(f"Error saving file: {e}")
@@ -176,9 +204,12 @@ def main():
         )
         index += 1
 
+    repositories.sort(key=lambda repo: repo["pipelines_time_spent"], reverse=True)
+    longest_slug = max(repositories, key=lambda repo: len(repo["slug"]))["slug"]
+
     if repositories:
         save_to_file(repositories, RAW_OUTPUT_FILE)
-        save_report(repositories, REPORT_OUTPUT_FILE)
+        save_report(repositories, REPORT_OUTPUT_FILE, longest_slug)
 
 
 if __name__ == "__main__":
