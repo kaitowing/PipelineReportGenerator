@@ -21,6 +21,7 @@ START_OF_THE_WEEK = datetime.today() - timedelta(days=7)
 
 total_users_list = []
 
+
 def fetch_repositories():
     """Fetch all repositories from the workspace updated since the start of the week."""
     url = f"{BASE_URL}/repositories/{WORKSPACE}"
@@ -43,10 +44,13 @@ def fetch_repositories():
             url = data.get("next")
             params = None
         else:
-            print(f"Error fetching repositories: {response.status_code}\n{response.text}")
+            print(
+                f"Error fetching repositories: {response.status_code}\n{response.text}"
+            )
             break
 
     return repositories
+
 
 def fetch_pipeline_data(repository_slug):
     """Fetch pipelines created since the start of the week for a repository.
@@ -75,7 +79,9 @@ def fetch_pipeline_data(repository_slug):
                 break
 
             for pipeline in data.get("values", []):
-                created_on = datetime.fromisoformat(pipeline["created_on"].split("Z")[0])
+                created_on = datetime.fromisoformat(
+                    pipeline["created_on"].split("Z")[0]
+                )
                 if created_on > START_OF_THE_WEEK:
                     pipelines.append(pipeline)
                     total_pipelines_count += 1
@@ -87,10 +93,18 @@ def fetch_pipeline_data(repository_slug):
                     url = None
                     break
         else:
-            print(f"Error fetching pipelines for {repository_slug}: {response.status_code}\n{response.text}")
+            print(
+                f"Error fetching pipelines for {repository_slug}: {response.status_code}\n{response.text}"
+            )
             break
 
-    return pipelines, total_pipelines_count, total_time_spent / 60, list(set(users_list))
+    return (
+        pipelines,
+        total_pipelines_count,
+        total_time_spent / 60,
+        list(set(users_list)),
+    )
+
 
 def save_to_file(data, file_path, mode="w", formatted=True):
     """Save data to a file."""
@@ -103,6 +117,7 @@ def save_to_file(data, file_path, mode="w", formatted=True):
     except IOError as error:
         print(f"Error saving file: {error}")
 
+
 def delete_file(file_path):
     """Delete a file."""
     try:
@@ -111,16 +126,22 @@ def delete_file(file_path):
     except FileNotFoundError:
         print(f"File {file_path} not found.")
 
-def save_report(repositories, file_path, longest_repository_slug=""):
+
+def save_report(repositories, file_path):
     """Save a report with repository and pipeline data formatted as a table for Slack."""
     try:
         delete_file(file_path)
         TOTAL_MINUTES_HEADER = "Total Minutes"
         TOTAL_PIPELINES_HEADER = "Number of Pipelines"
         AVERAGE_MINUTES_HEADER = "Average Minutes per Pipeline"
+        longest_repository_slug = max(repositories, key=lambda repo: len(repo["slug"]))[
+            "slug"
+        ]
 
         with open(file_path, "w") as file:
-            file.write(f"| {'Project'.ljust(len(longest_repository_slug))} | {TOTAL_MINUTES_HEADER} | {TOTAL_PIPELINES_HEADER} | {AVERAGE_MINUTES_HEADER} |\n")
+            file.write(
+                f"| {'Project'.ljust(len(longest_repository_slug))} | {TOTAL_MINUTES_HEADER} | {TOTAL_PIPELINES_HEADER} | {AVERAGE_MINUTES_HEADER} |\n"
+            )
 
             for repository in repositories:
                 slug = repository["slug"]
@@ -132,31 +153,44 @@ def save_report(repositories, file_path, longest_repository_slug=""):
                     else "0.00"
                 )
                 if repository["slug"] == longest_repository_slug:
-                    file.write(f"| {slug} | {pipelines_time_spent.ljust(len(TOTAL_MINUTES_HEADER))} | {pipelines_count.ljust(len(TOTAL_PIPELINES_HEADER))} | {average_time_spent.ljust(len(AVERAGE_MINUTES_HEADER))} |\n")
+                    file.write(
+                        f"| {slug} | {pipelines_time_spent.ljust(len(TOTAL_MINUTES_HEADER))} | {pipelines_count.ljust(len(TOTAL_PIPELINES_HEADER))} | {average_time_spent.ljust(len(AVERAGE_MINUTES_HEADER))} |\n"
+                    )
                 else:
-                    file.write(f"| {slug.ljust(len(longest_repository_slug))} | {pipelines_time_spent.ljust(len(TOTAL_MINUTES_HEADER))} | {pipelines_count.ljust(len(TOTAL_PIPELINES_HEADER))} | {average_time_spent.ljust(len(AVERAGE_MINUTES_HEADER))} |\n")
+                    file.write(
+                        f"| {slug.ljust(len(longest_repository_slug))} | {pipelines_time_spent.ljust(len(TOTAL_MINUTES_HEADER))} | {pipelines_count.ljust(len(TOTAL_PIPELINES_HEADER))} | {average_time_spent.ljust(len(AVERAGE_MINUTES_HEADER))} |\n"
+                    )
 
             if total_users_list:
                 user_with_most_pipelines = Counter(total_users_list).most_common(1)[0]
                 file.write("\n")
-                file.write(f"User with the most pipelines: {user_with_most_pipelines[0]} {user_with_most_pipelines[1]} pipelines\n")
+                file.write(
+                    f"User with the most pipelines: {user_with_most_pipelines[0]} {user_with_most_pipelines[1]} pipelines\n"
+                )
 
             user_time_spent = {}
             for repository in repositories:
                 for user in repository["users"]:
-                    user_time_spent[user] = user_time_spent.get(user, 0) + repository["pipelines_time_spent"]
+                    user_time_spent[user] = (
+                        user_time_spent.get(user, 0)
+                        + repository["pipelines_time_spent"]
+                    )
             if user_time_spent:
                 user_with_most_time = max(user_time_spent.items(), key=lambda x: x[1])
-                file.write(f"User with the most time spent: {user_with_most_time[0]} {user_with_most_time[1]:.2f} minutes\n")
+                file.write(
+                    f"User with the most time spent: {user_with_most_time[0]} {user_with_most_time[1]:.2f} minutes\n"
+                )
 
         print(f"Report saved to {file_path}")
     except IOError as error:
         print(f"Error saving file: {error}")
 
+
 def print_execution_completion(total, current):
     """Print the current execution completion."""
     percentage = (current / total) * 100
     print(f"Loading data... {current}/{total}  {percentage:.2f}%")
+
 
 def main():
     """Main script flow."""
@@ -176,11 +210,11 @@ def main():
         )
 
     repositories.sort(key=lambda repo: repo["pipelines_time_spent"], reverse=True)
-    longest_repository_slug = max(repositories, key=lambda repo: len(repo["slug"]))["slug"]
 
     if repositories:
         save_to_file(repositories, RAW_OUTPUT_FILE)
-        save_report(repositories, REPORT_OUTPUT_FILE, longest_repository_slug)
+        save_report(repositories, REPORT_OUTPUT_FILE)
+
 
 if __name__ == "__main__":
     main()
