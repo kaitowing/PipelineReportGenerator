@@ -25,6 +25,7 @@ START_OF_THE_WEEK = start_of_week
 
 total_users = []
 
+
 def fetch_repositories():
     """Fetch all repositories from the workspace updated since the start of the week."""
     url = f"{BASE_URL}/repositories/{WORKSPACE}"
@@ -130,11 +131,11 @@ def save_report(repositories, file_path):
     try:
         delete_file(file_path)
         with open(file_path, "w") as file:
-            file.write("# Repository and Pipeline Report\n\n")
+            file.write("# Repository and Pipeline Report\n")
             if total_users:
                 user_with_most_pipelines = Counter(total_users).most_common(1)[0]
                 file.write(
-                    f"\n-# **User with Most Pipelines Overall**: {user_with_most_pipelines[0]} ({user_with_most_pipelines[1]} pipelines)\n"
+                    f"## **User with Most Pipelines Overall**:\n- {user_with_most_pipelines[0]} ({user_with_most_pipelines[1]} pipelines)\n"
                 )
             for repo in repositories:
                 file.write(f"## Repository: {repo['slug']}\n")
