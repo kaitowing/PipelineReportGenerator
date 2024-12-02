@@ -115,12 +115,12 @@ def save_report(repositories, file_path, longest_repository_slug=""):
     """Save a report with repository and pipeline data formatted as a table for Slack."""
     try:
         delete_file(file_path)
-        TOTAL_MINUTES_HEADER = "Total de minutos"
-        TOTAL_PIPELINES_HEADER = "Quantidade de pipes"
-        AVERAGE_MINUTES_HEADER = "Média de minutos"
+        TOTAL_MINUTES_HEADER = "Total Minutes"
+        TOTAL_PIPELINES_HEADER = "Number of Pipelines"
+        AVERAGE_MINUTES_HEADER = "Average Minutes per Pipeline"
 
         with open(file_path, "w") as file:
-            file.write(f"| {'Projeto'.ljust(len(longest_repository_slug))} | {TOTAL_MINUTES_HEADER} | {TOTAL_PIPELINES_HEADER} | {AVERAGE_MINUTES_HEADER} |\n")
+            file.write(f"| {'Project'.ljust(len(longest_repository_slug))} | {TOTAL_MINUTES_HEADER} | {TOTAL_PIPELINES_HEADER} | {AVERAGE_MINUTES_HEADER} |\n")
 
             for repository in repositories:
                 slug = repository["slug"]
@@ -139,7 +139,7 @@ def save_report(repositories, file_path, longest_repository_slug=""):
             if total_users_list:
                 user_with_most_pipelines = Counter(total_users_list).most_common(1)[0]
                 file.write("\n")
-                file.write(f"Usuário com maior número de pipes: {user_with_most_pipelines[0]} {user_with_most_pipelines[1]} pipelines\n")
+                file.write(f"User with the most pipelines: {user_with_most_pipelines[0]} {user_with_most_pipelines[1]} pipelines\n")
 
             user_time_spent = {}
             for repository in repositories:
@@ -147,7 +147,7 @@ def save_report(repositories, file_path, longest_repository_slug=""):
                     user_time_spent[user] = user_time_spent.get(user, 0) + repository["pipelines_time_spent"]
             if user_time_spent:
                 user_with_most_time = max(user_time_spent.items(), key=lambda x: x[1])
-                file.write(f"Usuário com maior número de minutos: {user_with_most_time[0]} {user_with_most_time[1]:.2f} minutos\n")
+                file.write(f"User with the most time spent: {user_with_most_time[0]} {user_with_most_time[1]:.2f} minutes\n")
 
         print(f"Report saved to {file_path}")
     except IOError as error:
