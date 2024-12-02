@@ -1,3 +1,4 @@
+import time
 from token import STAR
 import requests
 import json
@@ -55,11 +56,13 @@ def fetch_pipelines_count(repo_slug):
     url = f"{BASE_URL}/repositories/{WORKSPACE}/{repo_slug}/pipelines/"
     params = {
         "fields": "values.created_on,values.completed_on,values.creator.display_name,values.creator.nickname,values.build_seconds_used,next",
-        "sort": f"-created_on",
+        "sort": "-created_on",
         "pagelen": 100,
     }
     pipelines = []
     count = 0
+    time_spent = 0
+    users = []
 
     while url:
         print(f"Buscando pipelines de: {repo_slug}")
@@ -69,6 +72,7 @@ def fetch_pipelines_count(repo_slug):
             if not data.get("values"):
                 break
 
+            url = data.get("next")
             for pipeline in data.get("values"):
                 timestamp = pipeline["created_on"].split("Z")[0][:26]
 
@@ -76,10 +80,12 @@ def fetch_pipelines_count(repo_slug):
                     #print(f"Data: {timestamp}")
                     pipelines.append(pipeline)
                     count += 1
-                    url = data.get("next")
+                    time_spent += pipeline["build_seconds_used"]
+                    if pipeline["creator"] and pipeline["creator"]["nickname"]:
+                        users.append(pipeline["creator"]["nickname"])
                     params = None
                 else:
-                    print(f"Data: {timestamp}")
+                    #print(f"Data: {timestamp}")
                     url = None
                     break
         else:
@@ -87,7 +93,7 @@ def fetch_pipelines_count(repo_slug):
             print(response.text)
             break
 
-    return pipelines, count
+    return pipelines, count, time_spent, users
 
 
 def save_repositories_to_file(repositories, file_path=OUTPUT_FILE):
@@ -97,6 +103,23 @@ def save_repositories_to_file(repositories, file_path=OUTPUT_FILE):
             formatted_data = json.dumps(repositories, indent=4)
             file.write(formatted_data)
         print(f"Repositórios salvos em {file_path}")
+    except IOError as e:
+        print(f"Erro ao salvar o arquivo: {e}")
+
+def save_report_to_file(repositories, file_path="report.txt"):
+    """Salva um relatório com os dados dos repositórios e pipelines."""
+    try:
+        with open(file_path, "w") as file:
+            file.write("Relatório de repositórios e pipelines\n\n")
+            for repo in repositories:
+                file.write(f"Repositório: {repo['slug']}\n")
+                file.write(f"Quantidade de pipelines: {repo['pipelines_count']}\n")
+                file.write(f"Tempo total gasto com pipelines: {repo['pipelines_time_spent']:.2f} minutos\n\n")
+                file.write("Usuários que criaram pipelines:\n")
+                for user in repo["users"]:
+                    file.write(f"- {user}\n")
+                file.write(f"Usuário que criou mais pipelines: {max(set(repo['users']), key=repo['users'].count)}\n\n")
+        print(f"Relatório salvo em {file_path}")
     except IOError as e:
         print(f"Erro ao salvar o arquivo: {e}")
 
@@ -112,12 +135,15 @@ def main():
     # repo["pipelines_count"] = count
 
     for repo in repositories:
-        pipelines, count = fetch_pipelines_count(repo["slug"])
-        repo["pipelines"] = pipelines
+        pipelines, count, time_spent, users = fetch_pipelines_count(repo["slug"])
+        repo["users"] = list(set(users))
         repo["pipelines_count"] = count
+        repo["pipelines_time_spent"] = time_spent / 60
+        repo["pipelines"] = pipelines
 
     if repositories:
         save_repositories_to_file(repositories)
+        save_report_to_file(repositories)
 
 
 if __name__ == "__main__":
