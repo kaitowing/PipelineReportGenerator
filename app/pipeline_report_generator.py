@@ -4,6 +4,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from collections import Counter
 
 # Load environment variables
 load_dotenv()
@@ -22,6 +23,7 @@ today = datetime.today()
 start_of_week = today - timedelta(days=today.weekday())
 START_OF_THE_WEEK = start_of_week
 
+total_users = []
 
 def fetch_repositories():
     """Fetch all repositories from the workspace updated since the start of the week."""
@@ -89,6 +91,7 @@ def fetch_pipeline_data(repo_slug):
                     total_time_spent += pipeline.get("build_seconds_used", 0)
                     if pipeline.get("creator"):
                         users.append(pipeline["creator"].get("nickname"))
+                        total_users.append(pipeline["creator"].get("nickname"))
                 else:
                     url = None
                     break
@@ -128,6 +131,11 @@ def save_report(repositories, file_path):
         delete_file(file_path)
         with open(file_path, "w") as file:
             file.write("# Repository and Pipeline Report\n\n")
+            if total_users:
+                user_with_most_pipelines = Counter(total_users).most_common(1)[0]
+                file.write(
+                    f"\n-# **User with Most Pipelines Overall**: {user_with_most_pipelines[0]} ({user_with_most_pipelines[1]} pipelines)\n"
+                )
             for repo in repositories:
                 file.write(f"## Repository: {repo['slug']}\n")
                 file.write(f"- **Number of Pipelines**: {repo['pipelines_count']}\n")
@@ -137,9 +145,6 @@ def save_report(repositories, file_path):
                 file.write("- **Users who Created Pipelines**:\n")
                 for user in repo["users"]:
                     file.write(f"  - {user}\n")
-                file.write(
-                    f"- **User with Most Pipelines**: {max(set(repo['users']), key=repo['users'].count) if repo['users'] else 'N/A'}\n\n"
-                )
         print(f"Report saved to {file_path}")
     except IOError as e:
         print(f"Error saving file: {e}")

@@ -1,10 +1,11 @@
 # Pipeline Report Generator
 
-This project is a Python script that generates a report on repositories and their respective pipelines in a Bitbucket workspace. The report includes the number of pipelines, total time spent, and information about users who created the pipelines.
+This project is a Python script that generates a report on repositories and their respective pipelines in a Bitbucket workspace. The report includes the number of pipelines, total time spent, and information about users who created the pipelines. Additionally, it identifies the user with the most pipelines across all repositories.
 
 ## Features
 - Fetches all repositories from a Bitbucket workspace that have been updated since the start of the week.
 - Collects pipeline data for each repository, including creation date, time spent, and user information.
+- Identifies the user with the most pipelines across all repositories.
 - Generates a detailed report in Markdown format.
 
 ## Requirements
@@ -13,6 +14,7 @@ This project is a Python script that generates a report on repositories and thei
 - The following Python packages:
   - `requests`
   - `python-dotenv`
+  - `collections`
 
 ## Installation
 1. Clone this repository:
@@ -54,7 +56,9 @@ The generated Markdown report (`report.md`) includes the following information f
 - **Number of Pipelines**: The number of pipelines run for the repository.
 - **Total Time Spent**: The total time spent on pipelines, in minutes.
 - **Users who Created Pipelines**: A list of users who triggered the pipelines.
-- **User with Most Pipelines**: The user who triggered the most pipelines.
+
+In addition, the report includes:
+- **User with Most Pipelines Overall**: The user who triggered the most pipelines across all repositories.
 
 ## Environment Variables
 The script uses the following environment variables, which should be set in a `.env` file:
@@ -72,6 +76,7 @@ An example of a generated report in Markdown format:
 
 ```markdown
 # Repository and Pipeline Report
+- **User with Most Pipelines Overall**: user1 (15 pipelines)
 
 ## Repository: example-repo
 - **Number of Pipelines**: 10
@@ -79,7 +84,7 @@ An example of a generated report in Markdown format:
 - **Users who Created Pipelines**:
   - user1
   - user2
-- **User with Most Pipelines**: user1
+
 ```
 
 ## Contributing
