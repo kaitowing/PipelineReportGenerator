@@ -15,11 +15,11 @@ APP_PASSWORD = os.getenv("BITBUCKET_APP_PASSWORD")
 RAW_OUTPUT_FILE = os.getenv("OUTPUT_FILE", "report.json")
 REPORT_OUTPUT_FILE = os.getenv("REPORT_OUTPUT_FILE", "report.md")
 IGNORE_FORKS = os.getenv("IGNORE_FORKS", "").split(",")
-IGNORE_PIPES = os.getenv("IGNORE_PIPES", "").split(",")
+IGNORE_REPO = os.getenv("IGNORE_REPO", "").split(",")
 
 # Set the start of the week to the previous Monday
 today = datetime.today()
-start_of_week = today - timedelta(days=7)
+start_of_week = today - timedelta(days=today.weekday())
 START_OF_THE_WEEK = start_of_week
 
 
@@ -38,7 +38,7 @@ def fetch_repositories():
         if response.status_code == 200:
             data = response.json()
             for repo in data.get("values", []):
-                if repo["slug"] not in IGNORE_PIPES and (
+                if repo["slug"] not in IGNORE_REPO and (
                     not repo.get("parent") or repo["parent"]["name"] not in IGNORE_FORKS
                 ):
                     repositories.append(repo)
@@ -55,7 +55,7 @@ def fetch_repositories():
 
 def fetch_pipeline_data(repo_slug):
     """Fetch pipelines created since the start of the week for a repository and return pipelines, number of pipelines,
-       total time spent and users who started the pipeline.
+    total time spent and users who started the pipeline.
     """
     url = f"{BASE_URL}/repositories/{WORKSPACE}/{repo_slug}/pipelines/"
     params = {
@@ -69,6 +69,7 @@ def fetch_pipeline_data(repo_slug):
     users = []
 
     while url:
+        print(f"Fetching pipelines for {repo_slug}")
         response = requests.get(url, auth=(USERNAME, APP_PASSWORD), params=params)
         if response.status_code == 200:
             data = response.json()
