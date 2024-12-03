@@ -176,14 +176,14 @@ def delete_existing_report(file_path):
 
 def get_longest_repository_slug(repositories):
     """Get the longest repository slug length."""
-    return max(repositories, key=lambda repo: len(repo["slug"]))["slug"]
+    return max(repositories[0:MAX_DISPLAY_REPOSITORIES], key=lambda repo: len(repo["slug"]))["slug"]
 
 
 def write_report_header(file, longest_repository_slug):
     """Write the report header to the file."""
     file.write("# Pipeline Report\n")
     file.write(
-        f"Time period: {START_OF_THE_WEEK.isoformat()} - {datetime.today().isoformat()}\n"
+        f"Time period: {START_OF_THE_WEEK.isoformat().split("T")[0]} - {datetime.today().isoformat().split("T")[0]}\n"
     )
     file.write(
         f"| {'Project'.ljust(len(longest_repository_slug))} | Total Minutes | Number of Pipelines | Average Minutes per Pipeline |\n"
