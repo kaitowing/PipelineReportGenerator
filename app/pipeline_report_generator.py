@@ -16,7 +16,7 @@ RAW_OUTPUT_FILE = os.getenv("OUTPUT_FILE", "report.json")
 REPORT_OUTPUT_FILE = os.getenv("REPORT_OUTPUT_FILE", "report.md")
 IGNORE_FORKS = os.getenv("IGNORE_FORKS", "").split(",")
 IGNORE_REPOSITORIES = os.getenv("IGNORE_REPO", "").split(",")
-START_OF_THE_WEEK = datetime.today()
+START_OF_THE_WEEK = datetime.today() - timedelta(days=7)
 MAX_DISPLAY_REPOSITORIES = 5
 
 users_map = {}
@@ -73,7 +73,6 @@ def fetch_pipeline_data(repository_slug):
         if response.status_code == 200:
             data = response.json()
             url = data.get("next")
-            params = None
 
             if not data.get("values"):
                 break
@@ -176,7 +175,9 @@ def delete_existing_report(file_path):
 
 def get_longest_repository_slug(repositories):
     """Get the longest repository slug length."""
-    return max(repositories[0:MAX_DISPLAY_REPOSITORIES], key=lambda repo: len(repo["slug"]))["slug"]
+    return max(
+        repositories[0:MAX_DISPLAY_REPOSITORIES], key=lambda repo: len(repo["slug"])
+    )["slug"]
 
 
 def write_report_header(file, longest_repository_slug):
