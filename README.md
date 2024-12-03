@@ -75,15 +75,16 @@ The script uses the following environment variables, which should be configured 
 An example of a generated report:
 
 ```markdown
-| Project  | Total Minutes | Number of Pipelines | Average Minutes per Pipeline |
-| project1 | 1098.55       | 100                 | 10.99                        |
-| project2 | 522.43        | 67                  | 7.80                         |
-| project3 | 346.38        | 20                  | 17.32                        |
-| project4 | 194.77        | 14                  | 13.91                        |
-| project5 | 166.27        | 32                  | 5.20                         |
+| Project                | Total Minutes | Number of Pipelines | Average Minutes per Pipeline |
+| project1               | 1098.55       | 100                 | 10.99                        |
+| project2               | 522.43        | 67                  | 7.80                         |
+| project3               | 346.38        | 20                  | 17.32                        |
+| project4               | 194.77        | 14                  | 13.91                        |
+| project5               | 166.27        | 32                  | 5.20                         |
+| Other (5 repositories) | 145.50        | 21                  | 6.93                         |
 
 User with the most pipelines: user1 104 pipelines
-User with the most time spent: user2 2873.00 minutes
+User with the most time spent: user2 1073.00 minutes
 ```
 
 ## Contributing
