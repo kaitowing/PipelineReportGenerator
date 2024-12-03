@@ -4,7 +4,6 @@ import json
 import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from collections import Counter
 
 load_dotenv()
 
