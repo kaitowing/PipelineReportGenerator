@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from collections import Counter
 
-# Load environment variables
 load_dotenv()
 
 BASE_URL = os.getenv("BITBUCKET_URL", "https://api.bitbucket.org/2.0")
@@ -17,9 +16,10 @@ RAW_OUTPUT_FILE = os.getenv("OUTPUT_FILE", "report.json")
 REPORT_OUTPUT_FILE = os.getenv("REPORT_OUTPUT_FILE", "report.md")
 IGNORE_FORKS = os.getenv("IGNORE_FORKS", "").split(",")
 IGNORE_REPOSITORIES = os.getenv("IGNORE_REPO", "").split(",")
-START_OF_THE_WEEK = datetime.today() - timedelta(days=7)
+START_OF_THE_WEEK = datetime.today()
+MAX_DISPLAY_REPOSITORIES = 5
 
-total_users_list = []
+users_map = {}
 
 
 def fetch_repositories():
@@ -63,9 +63,9 @@ def fetch_pipeline_data(repository_slug):
         "pagelen": 100,
     }
     pipelines = []
+    repository_users = []
     total_pipelines_count = 0
     total_time_spent = 0
-    users_list = []
 
     while url:
         print(f"Fetching pipelines for {repository_slug}")
@@ -87,8 +87,16 @@ def fetch_pipeline_data(repository_slug):
                     total_pipelines_count += 1
                     total_time_spent += pipeline.get("duration_in_seconds", 0)
                     if pipeline.get("creator"):
-                        users_list.append(pipeline["creator"].get("nickname"))
-                        total_users_list.append(pipeline["creator"].get("nickname"))
+                        repository_users.append(pipeline["creator"].get("nickname"))
+                        if pipeline["creator"].get("nickname") not in users_map:
+                            users_map[pipeline["creator"].get("nickname")] = {
+                                "count": 0,
+                                "time_spent": 0,
+                            }
+                        users_map[pipeline["creator"].get("nickname")]["count"] += 1
+                        users_map[pipeline["creator"].get("nickname")][
+                            "time_spent"
+                        ] += pipeline.get("duration_in_seconds", 0) / 60
                 else:
                     url = None
                     break
@@ -102,7 +110,7 @@ def fetch_pipeline_data(repository_slug):
         pipelines,
         total_pipelines_count,
         total_time_spent / 60,
-        list(set(users_list)),
+        repository_users,
     )
 
 
@@ -127,63 +135,109 @@ def delete_file(file_path):
         print(f"File {file_path} not found.")
 
 
-def save_report(repositories, file_path):
+def save_report(repositories, users, file_path):
     """Save a report with repository and pipeline data formatted as a table for Slack."""
     try:
-        delete_file(file_path)
-        TOTAL_MINUTES_HEADER = "Total Minutes"
-        TOTAL_PIPELINES_HEADER = "Number of Pipelines"
-        AVERAGE_MINUTES_HEADER = "Average Minutes per Pipeline"
-        longest_repository_slug = max(repositories, key=lambda repo: len(repo["slug"]))[
-            "slug"
-        ]
+        delete_existing_report(file_path)
+        longest_repository_slug = get_longest_repository_slug(repositories)
 
         with open(file_path, "w") as file:
-            file.write(
-                f"| {'Project'.ljust(len(longest_repository_slug))} | {TOTAL_MINUTES_HEADER} | {TOTAL_PIPELINES_HEADER} | {AVERAGE_MINUTES_HEADER} |\n"
-            )
-
-            for repository in repositories:
-                slug = repository["slug"]
-                pipelines_time_spent = f"{repository['pipelines_time_spent']:.2f}"
-                pipelines_count = str(repository["pipelines_count"])
-                average_time_spent = (
-                    f"{repository['pipelines_time_spent']/repository['pipelines_count']:.2f}"
-                    if repository["pipelines_count"]
-                    else "0.00"
-                )
-                if repository["slug"] == longest_repository_slug:
-                    file.write(
-                        f"| {slug} | {pipelines_time_spent.ljust(len(TOTAL_MINUTES_HEADER))} | {pipelines_count.ljust(len(TOTAL_PIPELINES_HEADER))} | {average_time_spent.ljust(len(AVERAGE_MINUTES_HEADER))} |\n"
-                    )
-                else:
-                    file.write(
-                        f"| {slug.ljust(len(longest_repository_slug))} | {pipelines_time_spent.ljust(len(TOTAL_MINUTES_HEADER))} | {pipelines_count.ljust(len(TOTAL_PIPELINES_HEADER))} | {average_time_spent.ljust(len(AVERAGE_MINUTES_HEADER))} |\n"
-                    )
-
-            if total_users_list:
-                user_with_most_pipelines = Counter(total_users_list).most_common(1)[0]
-                file.write("\n")
-                file.write(
-                    f"User with the most pipelines: {user_with_most_pipelines[0]} {user_with_most_pipelines[1]} pipelines\n"
-                )
-
-            user_time_spent = {}
-            for repository in repositories:
-                for user in repository["users"]:
-                    user_time_spent[user] = (
-                        user_time_spent.get(user, 0)
-                        + repository["pipelines_time_spent"]
-                    )
-            if user_time_spent:
-                user_with_most_time = max(user_time_spent.items(), key=lambda x: x[1])
-                file.write(
-                    f"User with the most time spent: {user_with_most_time[0]} {user_with_most_time[1]:.2f} minutes\n"
-                )
+            write_report_header(file, longest_repository_slug)
+            write_repository_data(file, repositories, longest_repository_slug)
+            write_users_summary(file, repositories, users)
 
         print(f"Report saved to {file_path}")
     except IOError as error:
         print(f"Error saving file: {error}")
+
+
+def write_users_summary(file, repositories, users):
+    user_with_most_pipelines = max(users.items(), key=lambda x: x[1]["count"])
+    print(user_with_most_pipelines[0])
+    file.write(
+        f"\nUser with the most pipelines: {user_with_most_pipelines[0]} {user_with_most_pipelines[1]["count"]} pipelines\n"
+    )
+
+    for repository in repositories:
+        user_with_most_time_spent = max(users.items(), key=lambda x: x[1]["time_spent"])
+
+    file.write(
+        f"User with the most time spent: {user_with_most_time_spent[0]} {user_with_most_time_spent[1]['time_spent']:.2f} minutes\n"
+    )
+
+
+def delete_existing_report(file_path):
+    """Delete the report file if it exists."""
+    import os
+
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+
+def get_longest_repository_slug(repositories):
+    """Get the longest repository slug length."""
+    return max(repositories, key=lambda repo: len(repo["slug"]))["slug"]
+
+
+def write_report_header(file, longest_repository_slug):
+    """Write the report header to the file."""
+    file.write("# Pipeline Report\n")
+    file.write(
+        f"Time period: {START_OF_THE_WEEK.isoformat()} - {datetime.today().isoformat()}\n"
+    )
+    file.write(
+        f"| {'Project'.ljust(len(longest_repository_slug))} | Total Minutes | Number of Pipelines | Average Minutes per Pipeline |\n"
+    )
+
+
+def write_repository_data(file, repositories, longest_repository_slug):
+    """Write repository data to the report file."""
+    for index, repository in enumerate(repositories, start=1):
+        write_single_repository_row(file, repository, longest_repository_slug)
+        if index == MAX_DISPLAY_REPOSITORIES:
+            write_other_repositories_summary(
+                file, repositories[index:], longest_repository_slug
+            )
+            break
+
+
+def write_single_repository_row(file, repository, longest_repository_slug):
+    """Write a single repository row to the report."""
+    slug = repository["slug"].ljust(len(longest_repository_slug))
+    total_minutes = f"{repository['pipelines_time_spent']:.2f}".ljust(
+        len("Total Minutes")
+    )
+    pipelines_count = str(repository["pipelines_count"]).ljust(
+        len("Number of Pipelines")
+    )
+    average_minutes = (
+        f"{repository['pipelines_time_spent'] / repository['pipelines_count']:.2f}"
+        if repository["pipelines_count"]
+        else "0.00"
+    ).ljust(len("Average Minutes per Pipeline"))
+    file.write(
+        f"| {slug} | {total_minutes} | {pipelines_count} | {average_minutes} |\n"
+    )
+
+
+def write_other_repositories_summary(file, other_repositories, longest_repository_slug):
+    """Write summary row for remaining repositories."""
+    other_count = len(other_repositories)
+    other_repositories_name = f"Other ({other_count} repositories)".ljust(
+        len(longest_repository_slug)
+    )
+    total_minutes = sum(repo["pipelines_time_spent"] for repo in other_repositories)
+    total_pipelines = sum(repo["pipelines_count"] for repo in other_repositories)
+    average_minutes = (
+        f"{total_minutes / total_pipelines:.2f}" if total_pipelines else "0.00"
+    )
+
+    total_minutes = f"{total_minutes:.2f}".ljust(len("Total Minutes"))
+    total_pipelines = str(total_pipelines).ljust(len("Number of Pipelines"))
+    average_minutes = average_minutes.ljust(len("Average Minutes per Pipeline"))
+    file.write(
+        f"| {other_repositories_name} | {total_minutes} | {total_pipelines} | {average_minutes} |\n"
+    )
 
 
 def print_execution_completion(total, current):
@@ -199,21 +253,22 @@ def main():
 
     for index, repository in enumerate(repositories):
         print_execution_completion(number_of_repositories, index)
-        pipelines, count, time_spent, users = fetch_pipeline_data(repository["slug"])
+        pipelines, count, time_spent, repository_users = fetch_pipeline_data(
+            repository["slug"]
+        )
         repository.update(
             {
                 "pipelines_count": count,
                 "pipelines_time_spent": time_spent,
-                "users": users,
                 "pipelines": pipelines,
+                "users": repository_users,
             }
         )
-
     repositories.sort(key=lambda repo: repo["pipelines_time_spent"], reverse=True)
 
     if repositories:
         save_to_file(repositories, RAW_OUTPUT_FILE)
-        save_report(repositories, REPORT_OUTPUT_FILE)
+        save_report(repositories, users_map, REPORT_OUTPUT_FILE)
 
 
 if __name__ == "__main__":
